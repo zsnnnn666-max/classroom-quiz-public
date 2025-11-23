@@ -1,0 +1,30 @@
+name: Write Answer Data
+on:
+  repository_dispatch:
+    types: [add_answer]
+jobs:
+  write:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read existing answers
+        id: read_answers
+        run: |
+          if [ -f "answers.json" ]; then
+            echo "answers=$(cat answers.json)" >> $GITHUB_ENV
+          else
+            echo "answers=[]" >> $GITHUB_ENV
+          fi
+      - name: Add new answer
+        run: |
+          NEW_ANSWER='${{ github.event.client_payload }}'
+          EXISTING_ANSWERS=${{ env.answers }}
+          COMBINED_ANSWERS=$(echo "$EXISTING_ANSWERS" | jq --argjson new "$NEW_ANSWER" '. + [$new]')
+          echo "$COMBINED_ANSWERS" > answers.json
+      - name: Commit changes
+        run: |
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+          git add answers.json
+          git commit -m "Add new student answer"
+          git push
