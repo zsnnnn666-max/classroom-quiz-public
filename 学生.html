@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学生答题页（无令牌版）</title>
+    <style>
+        body { font-family: 微软雅黑; text-align: center; padding: 20px; background: #f5f5f5; }
+        .box { max-width: 500px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px #ccc; }
+        .option { margin: 15px 0; padding: 12px; border: 2px solid #007bff; border-radius: 8px; text-align: left; cursor: pointer; }
+        .option.selected { background: #007bff; color: white; }
+        input, button { padding: 12px; font-size: 16px; border-radius: 8px; border: 2px solid #ccc; margin: 10px 0; width: 80%; }
+        button { background: #28a745; color: white; border: none; cursor: pointer; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .status { margin-top: 15px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>?? 科技课小测验</h1>
+        <input type="text" id="name" placeholder="请输入你的姓名（比如：张三）" required>
+
+        <h3>问题：Arduino主板上的5V引脚作用是？</h3>
+        <div class="option" data-ans="A">A. 提供5V电源给传感器</div>
+        <div class="option" data-ans="B">B. 控制LED灯闪烁</div>
+        <div class="option" data-ans="C">C. 读取传感器数据</div>
+        <div class="option" data-ans="D">D. 连接电脑下载程序</div>
+
+        <button id="submit" disabled>提交答案</button>
+        <div class="status" id="status"></div>
+    </div>
+
+    <script>
+        // -------------- 仅改这2处 --------------
+        const GITHUB_USER = "你的GitHub用户名"; // 比如 "xiaoming123"
+        const REPO_NAME = "classroom-quiz-public"; // 和仓库名一致
+        // ----------------------------------------
+
+        let selectedAns = null;
+        // 选择答案
+        document.querySelectorAll('.option').forEach(opt => {
+            opt.onclick = () => {
+                document.querySelectorAll('.option').forEach(o => o.classList.remove('selected'));
+                opt.classList.add('selected');
+                selectedAns = opt.dataset.ans;
+                document.getElementById('submit').disabled = false;
+            }
+        });
+
+        // 提交答案（无令牌，匿名写入）
+        document.getElementById('submit').onclick = async () => {
+            const name = document.getElementById('name').value.trim();
+            const status = document.getElementById('status');
+
+            if (!name) { alert('请输入姓名！'); return; }
+            status.textContent = '提交中...请稍等';
+            status.style.color = '#007bff';
+
+            try {
+                // 发送答案到GitHub工作流
+                const res = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${REPO_NAME}/dispatches`, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        event_type: 'add_answer',
+                        client_payload: {
+                            name: name,
+                            ans: selectedAns,
+                            time: new Date().toLocaleTimeString()
+                        }
+                    })
+                });
+
+                if (res.ok) {
+                    status.textContent = '提交成功！? 老师已经看到你的答案啦';
+                    status.style.color = '#28a745';
+                    document.getElementById('submit').disabled = true;
+                    document.querySelectorAll('.option').forEach(opt => opt.style.pointerEvents = 'none');
+                } else {
+                    throw new Error('提交失败，请重试');
+                }
+            } catch (err) {
+                status.textContent = `失败：${err.message}`;
+                status.style.color = '#dc3545';
+            }
+        };
+    </script>
+</body>
+</html>

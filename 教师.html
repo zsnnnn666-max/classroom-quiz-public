@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>教师实时监控页（无令牌版）</title>
+    <style>
+        body { font-family: 微软雅黑; text-align: center; padding: 20px; background: #f5f5f5; }
+        .box { max-width: 800px; margin: 30px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px #ccc; }
+        .stats { display: flex; justify-content: center; gap: 80px; margin: 30px 0; }
+        .stat-num { font-size: 48px; font-weight: bold; color: #007bff; }
+        .answer-list { text-align: left; margin-top: 20px; max-height: 400px; overflow-y: auto; }
+        .answer-item { padding: 15px; margin: 10px 0; border-left: 5px solid #007bff; background: #f8f9fa; border-radius: 0 8px 8px 0; }
+        .correct { border-left-color: #28a745; background: #e8f5e9; }
+        .wrong { border-left-color: #dc3545; background: #f8d7da; }
+        button { padding: 12px 24px; font-size: 16px; border-radius: 8px; border: none; background: #007bff; color: white; cursor: pointer; }
+        .status { margin-top: 15px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>?? 科技课答题实时监控</h1>
+        <button id="start">开始监控</button>
+
+        <p>题目：Arduino主板上的5V引脚作用是？<strong style="color: #28a745;">正确答案：A</strong></p>
+
+        <div class="stats">
+            <div>总提交人数<br><span class="stat-num" id="total">0</span></div>
+            <div>正确人数<br><span class="stat-num" id="correct">0</span></div>
+        </div>
+
+        <h3>答题详情（最新提交在最上面）</h3>
+        <div class="answer-list" id="answerList">
+            <p>未开始监控，请点击「开始监控」</p>
+        </div>
+        <div class="status" id="status"></div>
+    </div>
+
+    <script>
+        // -------------- 仅改这2处 --------------
+        const GITHUB_USER = "你的GitHub用户名"; // 和学生端一致
+        const REPO_NAME = "classroom-quiz-public"; // 和学生端一致
+        // ----------------------------------------
+
+        const correctAns = "A";
+        let timer = null;
+
+        // 拉取答案（无令牌，匿名读取）
+        async function getAnswers() {
+            const answerList = document.getElementById('answerList');
+            const totalEl = document.getElementById('total');
+            const correctEl = document.getElementById('correct');
+            const statusEl = document.getElementById('status');
+
+            try {
+                // 读取公开的answers.json文件
+                const res = await fetch(`https://raw.githubusercontent.com/${GITHUB_USER}/${REPO_NAME}/main/answers.json`);
+                if (!res.ok) throw new Error('拉取失败，请检查用户名和仓库名');
+
+                const answers = await res.json();
+                const total = answers.length;
+                const correctCount = answers.filter(ans => ans.ans === correctAns).length;
+
+                // 更新统计
+                totalEl.textContent = total;
+                correctEl.textContent = correctCount;
+                statusEl.textContent = `上次刷新：${new Date().toLocaleTimeString()}`;
+
+                // 更新详情
+                if (total === 0) { answerList.innerHTML = '<p>暂无学生提交答案</p>'; return; }
+                answers.sort((a, b) => new Date(b.time) - new Date(a.time));
+                let html = '';
+                answers.forEach(ans => {
+                    const isCorrect = ans.ans === correctAns;
+                    html += `
+                        <div class="answer-item ${isCorrect ? 'correct' : 'wrong'}">
+                            <strong>姓名：${ans.name}</strong>
+                            <p>答案：${ans.ans}（${isCorrect ? '正确 ??' : '错误 ?'}）</p>
+                            <p>时间：${ans.time}</p>
+                        </div>
+                    `;
+                });
+                answerList.innerHTML = html;
+            } catch (err) {
+                statusEl.textContent = `错误：${err.message}`;
+                statusEl.style.color = '#dc3545';
+            }
+        }
+
+        // 开始监控
+        document.getElementById('start').onclick = () => {
+            if (timer) clearInterval(timer);
+            getAnswers();
+            timer = setInterval(() => getAnswers(), 2000); // 2秒刷新一次
+
+            document.getElementById('start').disabled = true;
+            statusEl.textContent = '监控中...学生提交后2秒内显示';
+            statusEl.style.color = '#007bff';
+        };
+    </script>
+</body>
+</html>
